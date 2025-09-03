@@ -1,0 +1,12 @@
+{
+  "goal": 100,
+  "rescued_total": 0,
+  "merged_count": 0,
+  "success_rate": 0.0,
+  "acceptance_pct": 0.0,
+  "median_loc": 0,
+  "median_ttg": 0,
+  "rescued_today": 0,
+  "rescues_7d": 0,
+  "mrr": 0
+}
