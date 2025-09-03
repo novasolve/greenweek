@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Green Week | 100 Failing PRs → Green</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'SF Mono',Monaco,'Cascadia Code','Roboto Mono',Consolas,'Courier New',monospace;background:#0a0a0a;color:#e0e0e0;line-height:1.6;padding:20px}
+    .container{max-width:1400px;margin:0 auto}
+    header{border-bottom:1px solid #333;padding-bottom:20px;margin-bottom:30px}
+    h1{font-size:1.5rem;font-weight:400;color:#fff;margin-bottom:10px}
+    .subtitle{color:#888;font-size:.9rem}
+    .status-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:15px;margin-bottom:30px;padding:20px;background:#111;border:1px solid #222}
+    .stat{text-align:center}
+    .stat-value{font-size:2rem;color:#00ff00;font-weight:700;font-variant-numeric:tabular-nums}
+    .stat-label{font-size:.75rem;color:#666;text-transform:uppercase;letter-spacing:.05em}
+    .progress-bar{width:100%;height:40px;background:#111;border:1px solid #333;margin-bottom:30px;position:relative;overflow:hidden}
+    .progress-fill{height:100%;background:linear-gradient(90deg,#00ff00,#00cc00);transition:width .3s ease;position:relative}
+    .progress-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;z-index:10;font-size:1.1rem;text-shadow:0 0 4px rgba(0,0,0,.8)}
+    .live-indicator{display:inline-block;color:#ff4444;margin-bottom:20px;font-size:.85rem}
+    .live-indicator::before{content:'●';display:inline-block;margin-right:5px;animation:blink 2s infinite}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+    .pr-table{width:100%;border-collapse:collapse;margin-bottom:30px}
+    .pr-table th{text-align:left;padding:12px;border-bottom:2px solid #333;color:#888;font-weight:400;font-size:.85rem;text-transform:uppercase}
+    .pr-table td{padding:12px;border-bottom:1px solid #1a1a1a;font-size:.9rem}
+    .pr-table tr:hover{background:#111}
+    .pr-link{color:#4dabf7;text-decoration:none}.pr-link:hover{text-decoration:underline}
+    .status-badge{display:inline-block;padding:2px 8px;font-size:.75rem;border-radius:3px;font-weight:700}
+    .status-green{background:#00ff00;color:#000}.status-pending{background:#ffaa00;color:#000}.status-failed{background:#ff4444;color:#fff}
+    .loc-count{color:#00ff00;font-weight:700}.time-ago{color:#666;font-size:.85rem}
+    .actions{display:flex;gap:20px;margin:30px 0;padding-top:30px;border-top:1px solid #333}
+    .btn{padding:10px 20px;background:transparent;color:#00ff00;border:1px solid #00ff00;text-decoration:none;font:inherit;font-size:.9rem;cursor:pointer;transition:.2s}
+    .btn:hover{background:#00ff00;color:#000}.btn-secondary{color:#888;border-color:#888}.btn-secondary:hover{background:#888;color:#000}
+    .metadata{display:flex;gap:30px;margin-top:40px;padding:20px;background:#0d0d0d;border:1px solid #1a1a1a;font-size:.85rem;color:#666}
+    .metadata strong{color:#aaa}.repo-name{color:#fff;font-weight:700}.pr-number{color:#666}.merged-indicator{color:#b19cd9;font-size:.85rem;margin-left:10px}
+    @media (max-width:768px){.pr-table{font-size:.8rem}.pr-table th,.pr-table td{padding:8px}.status-bar{grid-template-columns:repeat(2,1fr)}}
+    .submit-form{position:fixed;bottom:20px;right:20px;background:#111;border:1px solid #333;padding:15px;z-index:100}
+    .submit-form input{background:#000;border:1px solid #333;color:#fff;padding:8px;width:250px;font:inherit;font-size:.85rem}
+    .submit-form button{margin-left:10px;padding:8px 15px;background:#00ff00;color:#000;border:0;font:inherit;font-size:.85rem;cursor:pointer}
+    .ascii-chart{font-family:monospace;font-size:.7rem;color:#00ff00;margin:20px 0;line-height:1.2}
+  </style>
+  <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🟢</text></svg>">
+</head>
+<body data-issue-repo="greenweek-ai/greenweek-site" data-agent="https://github.com/greenweek-ai/rescue-agent">
+  <div class="container">
+    <header>
+      <h1>GREEN WEEK: AI FIXING FAILING PULL REQUESTS</h1>
+      <div class="subtitle">Every patch ≤40 LOC. Every link is real. Every fix is verifiable.</div>
+    </header>
+
+    <div class="live-indicator" aria-live="polite">LIVE TRACKING</div>
+
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressBar" style="width:0%"></div>
+      <div class="progress-text" id="progressText">0/100 PRs RESCUED</div>
+    </div>
+
+    <div class="status-bar">
+      <div class="stat"><div class="stat-value" id="totalFixed">0</div><div class="stat-label">Fixed</div></div>
+      <div class="stat"><div class="stat-value" id="mergedCount">0</div><div class="stat-label">Merged</div></div>
+      <div class="stat"><div class="stat-value" id="successRate">0%</div><div class="stat-label">Success Rate</div></div>
+      <div class="stat"><div class="stat-value" id="medianLoc">0</div><div class="stat-label">Median LOC</div></div>
+      <div class="stat"><div class="stat-value" id="medianTtg">0h</div><div class="stat-label">Median TTG</div></div>
+      <div class="stat"><div class="stat-value" id="today">0</div><div class="stat-label">Today</div></div>
+      <div class="stat"><div class="stat-value" id="timeLeft">—</div><div class="stat-label">Time Left</div></div>
+      <div class="stat"><div class="stat-value" id="mrr">$0</div><div class="stat-label">MRR</div></div>
+    </div>
+
+    <div class="ascii-chart">
+PRs/Day  ▁▁▃▅▇█████▅▃▁▁  Target: 15/day
+         └─────────────┘
+         Day 1      Day 7
+    </div>
+
+    <table class="pr-table">
+      <thead>
+        <tr><th>Repository</th><th>PR</th><th>Status</th><th>LOC</th><th>Files</th><th>Time to Green</th><th>Fixed</th><th>Links</th></tr>
+      </thead>
+      <tbody id="prTableBody"></tbody>
+    </table>
+
+    <div class="actions">
+      <a href="./gallery/" class="btn">VIEW ALL <span id="rescuedCountLink">0</span> RESCUED PRS</a>
+      <a href="./stats.json" class="btn btn-secondary" rel="noopener noreferrer">RAW DATA (JSON)</a>
+      <a id="agentLink" href="#" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">AGENT SOURCE</a>
+      <button class="btn btn-secondary" type="button" onclick="share()">SHARE</button>
+    </div>
+
+    <div class="metadata">
+      <div><strong>Started:</strong> 2025-01-28 09:00 UTC</div>
+      <div><strong>Target:</strong> 100 PRs in 7 days</div>
+      <div><strong>Method:</strong> AI patches ≤40 LOC</div>
+      <div><strong>Agent Version:</strong> v0.3.2</div>
+      <div><strong>Last Update:</strong> <span id="lastUpdate">—</span></div>
+    </div>
+
+    <div class="submit-form">
+      <form onsubmit="submitPR(event)">
+        <input type="text" placeholder="github.com/owner/repo/pull/123" id="prUrl" />
+        <button type="submit">SUBMIT PR</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const qs = (s) => document.querySelector(s);
+    const bust = () => '?t=' + Date.now();
+
+    function issueRepoFromContext(){
+      const explicit = document.body.dataset.issueRepo;
+      if (explicit) return explicit;
+      try {
+        const host = location.hostname;
+        if (host.endsWith('github.io')) {
+          const owner = host.split('.')[0];
+          const repo  = location.pathname.split('/').filter(Boolean)[0] || '';
+          if (owner && repo) return `${owner}/${repo}`;
+        }
+      } catch(e) {}
+      return '';
+    }
+
+    (function initAgentLink(){
+      const href = document.body.dataset.agent || 'https://github.com/greenweek-ai/rescue-agent';
+      const a = document.getElementById('agentLink');
+      if (a) a.href = href;
+    })();
+
+    async function share(){
+      const rescued = (document.querySelector('#totalFixed')?.textContent || '0');
+      const text = `Green Week: AI is fixing 100 failing PRs in 7 days. Currently at ${rescued}/100. Every fix ≤40 LOC.`;
+      const url  = location.protocol.startsWith('http') ? location.href : '';
+      if (navigator.share) {
+        try { await navigator.share({ title: 'Green Week — Live', text, url }); return; } catch (e) {}
+      }
+      try { await navigator.clipboard.writeText(url ? `${text} ${url}` : text); alert('Link copied'); return; } catch (e) {}
+      const ta = document.createElement('textarea');
+      ta.value = url ? `${text} ${url}` : text;
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+      alert('Link copied');
+    }
+
+    function updateLastRefresh(){
+      const start = new Date();
+      const el = qs('#lastUpdate');
+      const tick = () => {
+        const mins = Math.floor((new Date() - start)/60000);
+        el.textContent = mins===0 ? 'Just now' : `${mins} min ago`;
+      };
+      tick(); setInterval(tick, 60000);
+    }
+
+    function updateCountdown(){
+      const end = new Date('2025-02-04T09:00:00Z');
+      const tick = () => {
+        const diff = Math.max(0, end - new Date());
+        const d = Math.floor(diff/86400000);
+        const h = Math.floor((diff%86400000)/3600000);
+        qs('#timeLeft').textContent = `${d}d ${h}h`;
+      };
+      tick(); setInterval(tick, 60000);
+    }
+
+    function formatTtg(hours){
+      if (hours == null || isNaN(hours)) return '—';
+      const h = Math.floor(Number(hours));
+      const m = Math.round((Number(hours) - h) * 60);
+      return `${h}h ${m}m`;
+    }
+
+    function formatTimeAgo(date){
+      if (!(date instanceof Date) || isNaN(date)) return '—';
+      const ms = Date.now() - date.getTime();
+      const mins = Math.floor(ms/60000);
+      if (mins < 1) return 'Just now';
+      if (mins < 60) return `${mins} min ago`;
+      const hrs = Math.floor(mins/60);
+      if (hrs < 24) return `${hrs} h ago`;
+      const days = Math.floor(hrs/24);
+      return `${days} d ago`;
+    }
+
+    function renderTable(items){
+      const tbody = qs('#prTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      if (!Array.isArray(items) || !items.length) return;
+
+      const rank = (s) => s === 'GREEN' ? 0 : (s === 'PENDING' ? 1 : 2);
+      items.sort((a,b)=>{
+        const ra = rank(a.status), rb = rank(b.status);
+        if (ra !== rb) return ra - rb;
+        const ta = a.fixed_at ? Date.parse(a.fixed_at) : 0;
+        const tb = b.fixed_at ? Date.parse(b.fixed_at) : 0;
+        return tb - ta;
+      });
+
+      const frag = document.createDocumentFragment();
+      for (const pr of items){
+        const tr = document.createElement('tr');
+
+        const tdRepo = document.createElement('td');
+        const repoSpan = document.createElement('span');
+        repoSpan.className = 'repo-name';
+        repoSpan.textContent = `${pr.owner}/${pr.repo}`;
+        tdRepo.appendChild(repoSpan);
+        tr.appendChild(tdRepo);
+
+        const tdNum = document.createElement('td');
+        const numSpan = document.createElement('span');
+        numSpan.className = 'pr-number';
+        numSpan.textContent = `#${pr.pr_number}`;
+        tdNum.appendChild(numSpan);
+        tr.appendChild(tdNum);
+
+        const tdStatus = document.createElement('td');
+        const badge = document.createElement('span');
+        const status = pr.status || '—';
+        badge.className = 'status-badge ' + (status==='GREEN'?'status-green':status==='FAILED'?'status-failed':'status-pending');
+        badge.textContent = status;
+        tdStatus.appendChild(badge);
+        if (pr.merged) {
+          const merged = document.createElement('span');
+          merged.className = 'merged-indicator';
+          merged.textContent = 'MERGED';
+          tdStatus.appendChild(merged);
+        }
+        tr.appendChild(tdStatus);
+
+        const tdLoc = document.createElement('td');
+        const locSpan = document.createElement('span');
+        locSpan.className = 'loc-count';
+        locSpan.textContent = (Number.isFinite(pr.loc) ? pr.loc : (pr.loc ?? '—'));
+        tdLoc.appendChild(locSpan);
+        tr.appendChild(tdLoc);
+
+        const tdFiles = document.createElement('td');
+        tdFiles.textContent = Number.isFinite(pr.files) ? pr.files : (pr.files ?? '—');
+        tr.appendChild(tdFiles);
+
+        const tdTtg = document.createElement('td');
+        tdTtg.textContent = formatTtg(pr.ttg_hours);
+        tr.appendChild(tdTtg);
+
+        const tdFixed = document.createElement('td');
+        tdFixed.className = 'time-ago';
+        if (pr.fixed_at) {
+          tdFixed.dataset.fixedAt = pr.fixed_at;
+          tdFixed.textContent = formatTimeAgo(new Date(pr.fixed_at));
+        } else {
+          tdFixed.textContent = '—';
+        }
+        tr.appendChild(tdFixed);
+
+        const tdLinks = document.createElement('td');
+        const aOrig = document.createElement('a');
+        aOrig.className = 'pr-link';
+        aOrig.href = `https://github.com/${pr.owner}/${pr.repo}/pull/${pr.pr_number}`;
+        aOrig.target = '_blank'; aOrig.rel = 'noopener noreferrer';
+        aOrig.textContent = 'Original';
+        tdLinks.appendChild(aOrig);
+        if (pr.fix_pr_number) {
+          tdLinks.appendChild(document.createTextNode(' | '));
+          const aFix = document.createElement('a');
+          aFix.className = 'pr-link';
+          aFix.href = `https://github.com/${pr.owner}/${pr.repo}/pull/${pr.fix_pr_number}`;
+          aFix.target = '_blank'; aFix.rel = 'noopener noreferrer';
+          aFix.textContent = 'Fix';
+          tdLinks.appendChild(aFix);
+        }
+        tr.appendChild(tdLinks);
+
+        frag.appendChild(tr);
+      }
+      tbody.appendChild(frag);
+    }
+
+    function updateRowTimeAgo(){
+      document.querySelectorAll('td.time-ago[data-fixed-at]').forEach(td=>{
+        td.textContent = formatTimeAgo(new Date(td.dataset.fixedAt));
+      });
+    }
+
+    function countLast24h(items){
+      const since = Date.now() - 24*60*60*1000;
+      let n = 0;
+      for (const pr of (items||[])){
+        if (pr.status === 'GREEN' && pr.fixed_at && Date.parse(pr.fixed_at) >= since) n++;
+      }
+      return n;
+    }
+
+    async function refresh(){
+      try{
+        const [statsRes, prsRes] = await Promise.all([
+          fetch('./stats.json'+bust(), {cache:'no-store'}),
+          fetch('./prs.json'+bust(),   {cache:'no-store'}).catch(()=>null),
+        ]);
+        const stats = statsRes.ok ? await statsRes.json() : {};
+        const items = prsRes && prsRes.ok ? await prsRes.json() : [];
+
+        const goal     = Number(stats.goal ?? 100);
+        const rescued  = Number(stats.rescued_total ?? items.filter(i=>i.status==='GREEN').length ?? 0);
+        const mergedCt = Number(stats.merged_count  ?? items.filter(i=>i.merged).length ?? 0);
+        const rate     = Number.isFinite(stats.success_rate) ? Math.round(stats.success_rate) :
+                         (rescued ? Math.round(100*mergedCt/rescued) : 0);
+
+        qs('#totalFixed').textContent = rescued;
+        qs('#mergedCount').textContent = mergedCt;
+        qs('#successRate').textContent = `${rate}%`;
+        qs('#medianLoc').textContent = Number(stats.median_loc ?? 0);
+        qs('#medianTtg').textContent = `${Number(stats.median_ttg ?? 0)}h`;
+        qs('#today').textContent = Number(stats.rescued_today ?? countLast24h(items));
+        qs('#mrr').textContent = `$${Number(stats.mrr ?? 0)}`;
+        qs('#rescuedCountLink').textContent = rescued;
+
+        const pct = Math.min(100, Math.round(100*rescued/goal));
+        qs('#progressBar').style.width = pct + '%';
+        qs('#progressText').textContent = `${rescued}/${goal} PRs RESCUED`;
+        renderTable(items);
+        updateRowTimeAgo();
+      }catch(err){ console.error('Refresh failed:', err); }
+    }
+
+    function submitPR(e){
+      e.preventDefault();
+      const raw = qs('#prUrl').value.trim();
+      const m = raw.match(/github\.com\/([^\/]+)\/([^\/]+)\/pull\/(\d+)/);
+      if(!m) return alert('Invalid PR URL. Format: github.com/owner/repo/pull/123');
+      const repo = issueRepoFromContext();
+      if(!repo) return alert('Cannot detect issue repo. Set data-issue-repo on <body>.');
+      const issueUrl = `https://github.com/${repo}/issues/new?title=${encodeURIComponent('Rescue request: PR '+m[3])}&body=${encodeURIComponent('Please rescue this PR: '+raw)}`;
+      window.open(issueUrl,'_blank','noopener,noreferrer');
+      qs('#prUrl').value='';
+    }
+
+    updateLastRefresh();
+    updateCountdown();
+    refresh();
+    setInterval(refresh, 30000);
+    setInterval(updateRowTimeAgo, 60000);
+  </script>
+</body>
+</html>
